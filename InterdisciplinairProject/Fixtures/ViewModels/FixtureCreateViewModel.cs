@@ -121,7 +121,7 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
                 if (_imageBase64 != value)
                 {
                     _imageBase64 = value;
-                    OnPropertyChanged(); // als je INotifyPropertyChanged gebruikt
+                    OnPropertyChanged();
                 }
             }
         }
@@ -169,7 +169,7 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
             {
                 _isEditing = false;
                 SelectedManufacturer = AvailableManufacturers.FirstOrDefault();
-                _currentFixture = new Fixture(); // 🔹 altijd een geldige Fixture
+                _currentFixture = new Fixture();
                 AddChannel();
             }
         }
@@ -217,7 +217,7 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
 
         private void SaveFixture()
         {
-            // 🔎 Validatie
+            // Validatie
             if (Channels.Any(ch =>
                     string.Equals(ch.SelectedType, "Select a type", StringComparison.OrdinalIgnoreCase)))
             {
@@ -234,17 +234,20 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
                 return;
             }
 
-            // 🔧 Vul het Fixture model
+            // Vul het Fixture model
             _currentFixture.Name = FixtureName;
             _currentFixture.Manufacturer = SelectedManufacturer ?? "Unknown";
             _currentFixture.ImageBase64 = !string.IsNullOrEmpty(ImageBase64)
                 ? ImageCompressionHelpers.CompressBase64(ImageBase64)
                 : string.Empty;
-            _currentFixture.Channels = new ObservableCollection<Channel>(
-                Channels.Select(ci => ci.ToModel())
-            );
+            _currentFixture.Channels = new ObservableCollection<Channel>(Channels.Select(ci => ci.ToModel()));
 
-            // 🔧 Bestandsnaam en map
+            if (!_isEditing || string.IsNullOrEmpty(_currentFixture.FixtureId))
+            {
+                _currentFixture.FixtureId = GenerateFixtureId(_currentFixture.Manufacturer, _currentFixture.Name);
+            }
+
+            // Bestandsnaam en map
             string manufacturer = _currentFixture.Manufacturer;
             string safeManufacturerName = SanitizeFileName(manufacturer);
             string safeFixtureName = SanitizeFileName(_currentFixture.Name);
@@ -274,7 +277,7 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
 
             try
             {
-                // 🔧 Verwijder oude file bij rename
+                // Verwijder oude file bij rename
                 if (_isEditing && (_originalFixtureName != FixtureName || _originalManufacturer != manufacturer))
                 {
                     string safeOriginalManufacturerName = SanitizeFileName(_originalManufacturer!);
@@ -299,6 +302,15 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
                 MessageBox.Show($"Error saving fixture: {ioEx.Message}", "Save error",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        // uniek fixtureId genereren op basis van naam + manu + tijd aangemaakt
+        public static string GenerateFixtureId(string manufacturer, string name)
+        {
+            string input = $"{manufacturer}_{name}_{DateTime.UtcNow.Ticks}";
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            byte[] hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input));
+            return $"{manufacturer}_{name}_{BitConverter.ToString(hash).Replace("-", "").Substring(0, 6)}";
         }
 
         private void AddChannel()

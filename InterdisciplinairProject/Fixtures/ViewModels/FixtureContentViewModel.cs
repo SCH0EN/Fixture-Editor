@@ -23,13 +23,19 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
         private string? _selectedMethod = "Standard DMX";
 
         public event EventHandler? DeleteRequested;
+
         public event EventHandler? BackRequested;
+
         public event EventHandler<FixtureContentViewModel>? EditRequested;
 
         public string? Name { get => _name; set => SetProperty(ref _name, value); }
+
         public string? Manufacturer { get => _manufacturer; set => SetProperty(ref _manufacturer, value); }
+
         public string? ImagePath { get => _imagePath; set => SetProperty(ref _imagePath, value); }
+
         public string? ImageBase64 { get; set; }
+
         public string? ComPort { get => _comPort; set => SetProperty(ref _comPort, value); }
 
         // WiFi properties for ELO (WiFi)
@@ -37,6 +43,7 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
         private int _wifiPort = 6038; // default port
 
         public string? WifiIP { get => _wifiIP; set => SetProperty(ref _wifiIP, value); }
+
         public int WifiPort { get => _wifiPort; set => SetProperty(ref _wifiPort, value); }
 
         // UPDATED LABELS
@@ -50,7 +57,11 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
         public string? SelectedMethod { get => _selectedMethod; set => SetProperty(ref _selectedMethod, value); }
 
         public ObservableCollection<string> AvailablePorts { get; set; } = new();
+
         public ObservableCollection<Channel> Channels { get; set; } = new();
+
+        [ObservableProperty]
+        private int startAddress = 1;
 
         public ICommand BackCommand { get; }
         public ICommand EditCommand { get; }
@@ -141,16 +152,20 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
                 return;
             }
 
-            // Build a small frame with just this channel
-            byte[] eloData = new byte[Channels.Count];
+            // frame bouwen met offset
+            int offset = StartAddress - 1;
+            int channelIndex = Channels.IndexOf(channel);
+
+            byte[] eloData = new byte[512];
             for (int i = 0; i < Channels.Count; i++)
-                eloData[i] = (i == Channels.IndexOf(channel)) ? (byte)channel.Parameter : (byte)0;
+                eloData[i + offset] = (i == channelIndex) ? (byte)channel.Parameter : (byte)0;
 
             if (SelectedMethod == "Standard DMX")
             {
                 byte[] dmx = new byte[512];
-                dmx[Channels.IndexOf(channel)] = (byte)channel.Parameter;
+                dmx[Channels.IndexOf(channel) + offset] = (byte)channel.Parameter;
                 DMXCommunication.SendDMXFrame(ComPort!, dmx);
+
             }
             else if (SelectedMethod == "ELO (Cable)")
             {
@@ -185,27 +200,28 @@ namespace InterdisciplinairProject.Fixtures.ViewModels
                 }
             }
 
+            int offset = StartAddress - 1;
             if (SelectedMethod == "Standard DMX")
             {
                 byte[] dmx = new byte[512];
-                for (int i = 0; i < Channels.Count && i < 512; i++)
-                    dmx[i] = (byte)Channels[i].Parameter;
+                for (int i = 0; i < Channels.Count && i + offset < 512; i++)
+                    dmx[i + offset] = (byte)Channels[i].Parameter;
 
                 DMXCommunication.SendDMXFrame(ComPort!, dmx);
             }
             else if (SelectedMethod == "ELO (Cable)")
             {
-                byte[] eloData = new byte[Channels.Count];
+                byte[] eloData = new byte[512];
                 for (int i = 0; i < Channels.Count; i++)
-                    eloData[i] = (byte)Channels[i].Parameter;
+                    eloData[i + offset] = (byte)Channels[i].Parameter;
 
                 DMXCommunication.SendELOFrame(ComPort!, eloData);
             }
             else if (SelectedMethod == "ELO (WiFi)")
             {
-                byte[] eloData = new byte[Channels.Count];
+                byte[] eloData = new byte[512];
                 for (int i = 0; i < Channels.Count; i++)
-                    eloData[i] = (byte)Channels[i].Parameter;
+                    eloData[i + offset] = (byte)Channels[i].Parameter;
 
                 DMXCommunication.SendELOWifiFrame(WifiIP!, WifiPort, eloData);
             }
